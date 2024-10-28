@@ -38,12 +38,6 @@ class MyWatermarkedModel(GPT2LMHeadModel):
         print("Reset seed")
         random.seed(self.__sk)
 
-    # Change secret key
-    def set_seed(self, sk):
-        print("Set seed to ", sk)
-        self.__sk = sk
-        random.seed(self.__sk)
-
     def generate(
             self,
             **kwargs,
