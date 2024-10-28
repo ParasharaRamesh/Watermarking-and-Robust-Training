@@ -28,10 +28,10 @@ class MyWatermarkLogitsProcessor(LogitsProcessor):
         vocab_tensor = torch.arange(scores.shape[-1], device=scores.device)
         next_token_mask = torch.isin(vocab_tensor, next_token_id)  # boolean mask for each of the elements
 
-        # TODO.question why is the scores_processed from before not used?
         scores_processed = scores.masked_fill(next_token_mask, float("inf"))  # only the element at next_token_id will be made inf while the rest remains as is
 
-        scores_processed = scores.masked_fill(~next_token_mask, -float("inf"))  # all other entries apart from the next token is made as -inf
+        #TODO.x check if this is correct and whether 'scores_processed' is supposed to be used.
+        scores_processed = scores_processed.masked_fill(~next_token_mask, -float("inf"))  # all other entries apart from the next token is made as -inf
         return scores_processed
 
 
@@ -105,10 +105,16 @@ def verify_str(input_str, sk, model, tokenizer, max_new_tokens):
         scores = outputs.scores[i]
         scores_processed = scores.clone().flatten().softmax(dim=-1)
         r = rs[i]
-        # TODO: Check if the next token is the one chosen by r
-        valid = True
+
+        # Using same logic as finding out the cummulative probability buckets to find out the next token id
+        bucket_probs = scores_processed.cumsum(dim=-1)
+        check_next_token_id = torch.searchsorted(bucket_probs, r)
+
+        # check if the tokens are indeed the same
+        valid = check_next_token_id.item() == next_token_id.item()
 
         valids.append(valid)
+
     # Check if 90% of generated tokens pass our verifier check
     if np.array(valids).mean() >= 0.9:
         return True
@@ -146,14 +152,15 @@ if __name__ == '__main__':
 
         print(f" -> Original model outputs..")
         print(query_model(input_str, MODEL_ORIG, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
+        print("Verifying if output is watermarked.. (Should be False)")
+        print(verify_str(input_str, SECRET_KEY, MODEL_ORIG, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
         print("-" * 50)
 
         print(f" -> New watermarked model outputs..")
         print(query_model(input_str, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
+        print("Verifying if output is watermarked.. (Should be True)")
+        print(verify_str(input_str, SECRET_KEY, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
         print("-" * 50)
-
-        # print("Verifying watermarked model..")
-        # print(verify_str(input_str, SECRET_KEY, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
 
         print("=" * 50)
         print()
