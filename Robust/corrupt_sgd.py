@@ -51,7 +51,7 @@ def corrupt_gradients(stacked_grads, epsilon):
     Returns:
         corrupted_gradients: List of gradients after applying corruption.
     """
-    # TODO: corrupt epsilon fraction of the batch of gradients
+    # TODO.Q2: corrupt epsilon fraction of the batch of gradients
     
     return stacked_grads
 
