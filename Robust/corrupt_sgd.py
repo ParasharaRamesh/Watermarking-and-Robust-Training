@@ -52,7 +52,14 @@ def corrupt_gradients(stacked_grads, epsilon):
         corrupted_gradients: List of gradients after applying corruption.
     """
     # TODO.Q2: corrupt epsilon fraction of the batch of gradients
-    
+    '''
+    strategy 1: just corrupt the epsilon fraction and make it all zero ( because it is centered around zero it wont remove it)
+    strategy 2: just place everything at that benign variance boundary:
+    - find the direction of the max eigen vector from the original
+    - pick the top epsilon fraction of grads which are generally pointing in that direction and replace everything with max-eigen-vector* benign std dev.
+    strategy 3: just place everything at the second largest eigen vector direction (or some combo because eigen vectors are generally orthonormal)
+    '''
+
     return stacked_grads
 
 # Generic train procedure for single batch of data
