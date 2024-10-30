@@ -12,6 +12,7 @@ from robust_aggregator import robust_aggregator, calculate_covariance_matrix
 import logging
 import autograd_hacks
 
+
 # Compute accuracy
 def binary_accuracy(preds, y):
     rounded_preds = torch.argmax(preds, dim=1)
@@ -19,6 +20,7 @@ def binary_accuracy(preds, y):
     acc_num = correct.sum()
     acc = acc_num / len(correct)
     return acc_num, acc
+
 
 def process_data(data_file_path, seed):
     logger.info("Loading file " + data_file_path)
@@ -33,6 +35,7 @@ def process_data(data_file_path, seed):
         label_list.append(float(label.strip()))
     return text_list, label_list
 
+
 def process_model(model_path, device):
     logger.info("Loading model " + model_path)
     tokenizer = BertTokenizer.from_pretrained(model_path)
@@ -40,6 +43,7 @@ def process_model(model_path, device):
     model = model.to(device)
     parallel_model = nn.DataParallel(model)
     return model, parallel_model, tokenizer
+
 
 # Randomly sample epsilon fraction of the gradients to corrupt
 def corrupt_gradients(stacked_grads, epsilon):
@@ -64,11 +68,12 @@ def corrupt_gradients(stacked_grads, epsilon):
 
     return corruption_strategy_1(stacked_grads, epsilon)
 
+
 def corruption_strategy_1(stacked_grads, epsilon):
     '''
     Just corrupt the epsilon fraction and make it all zero (because it is centered around zero it wont remove it)
     '''
-    n = stacked_grads.shape[0] #stacked_grads shape is (batch_size, N)
+    n = stacked_grads.shape[0]  # stacked_grads shape is (batch_size, N)
     num_corrupt = int(n * epsilon)
 
     # Randomly choose num_corrupt indices in the range [0, n) without replacement
@@ -82,9 +87,10 @@ def corruption_strategy_1(stacked_grads, epsilon):
 
     return stacked_grads
 
+
 def corruption_strategy_2(stacked_grads, epsilon):
     '''similar to strategy 1, just that we pick epsilon vectors which are mostly aligned in the direction of the max eigen vector and make that zero'''
-    n = stacked_grads.shape[0] #stacked_grads shape is (batch_size, N)
+    n = stacked_grads.shape[0]  # stacked_grads shape is (batch_size, N)
     num_corrupt = int(n * epsilon)
 
     # find the largest eigen vector
@@ -96,7 +102,7 @@ def corruption_strategy_2(stacked_grads, epsilon):
     max_var_direction = U[max_index]
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
-    projections_on_max_var = stacked_grads @ max_var_direction # shape (n,)
+    projections_on_max_var = stacked_grads @ max_var_direction  # shape (n,)
     _, top_indices = torch.topk(projections_on_max_var, num_corrupt, largest=True)
 
     # creating a zero tensor similar to the same shape, type and input device
@@ -106,6 +112,7 @@ def corruption_strategy_2(stacked_grads, epsilon):
     stacked_grads[top_indices] = zero_tensor
 
     return stacked_grads
+
 
 # Generic train procedure for single batch of data
 # Simulate corrupting epsilon fraction of gradients of the classification layer
@@ -140,9 +147,10 @@ def corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon):
     optimizer.zero_grad()
     return loss, acc_num, filtered_cnt
 
+
 # Generic train function for single epoch (over all batches of data)
 def corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
-                batch_size, optimizer, criterion, device, epsilon):
+                        batch_size, optimizer, criterion, device, epsilon):
     """
     Generic train function for single epoch (over all batches of data)
 
@@ -181,7 +189,7 @@ def corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
         labels = torch.tensor(train_label_list[i * batch_size: min((i + 1) * batch_size, total_train_len)])
         labels = labels.long().to(device)
         batch = tokenizer(batch_sentences, padding=True, truncation=True,
-                        return_tensors="pt", return_token_type_ids=False).to(device)
+                          return_tensors="pt", return_token_type_ids=False).to(device)
         loss, acc_num, filtered_cnt = corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon)
         epoch_loss += loss.item() * len(batch_sentences)
         epoch_acc_num += acc_num
@@ -189,9 +197,10 @@ def corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
 
     return epoch_loss / total_train_len, epoch_acc_num / total_train_len, filtered_cnts / total_train_len
 
+
 def corrupt_train(train_data_path, model, tokenizer,
-                batch_size, epochs, optimizer, criterion,
-                device, seed, save_model=True, save_path=None, save_metric='loss', epsilon=0.1):
+                  batch_size, epochs, optimizer, criterion,
+                  device, seed, save_model=True, save_path=None, save_metric='loss', epsilon=0.1):
     logger.info('Seed: ' + str(seed))
     random.seed(seed)
     np.random.seed(seed)
@@ -208,13 +217,15 @@ def corrupt_train(train_data_path, model, tokenizer,
         logger.info("Epoch: " + str(epoch))
         model.train(True)
         train_loss, train_acc, filter_ratio = corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
-                                            batch_size, optimizer, criterion, device, epsilon)
+                                                                  batch_size, optimizer, criterion, device, epsilon)
 
-        logger.info(f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc * 100:.2f}% | Filter ratio: {filter_ratio * 100:.2f}%')
+        logger.info(
+            f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc * 100:.2f}% | Filter ratio: {filter_ratio * 100:.2f}%')
 
     if save_model:
         # os.makedirs(save_path, exist_ok=True)
         torch.save(model, save_path)
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(filename='corrupt_sgd.log', encoding='utf-8', level=logging.DEBUG)
@@ -225,10 +236,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='model clean training')
     parser.add_argument('--ori_model_path', type=str, help='original model path', default="SST2_clean_model")
     parser.add_argument('--epochs', type=int, help='num of epochs', default=3)
-    parser.add_argument('--save_model_path', type=str, help='path that new model saved in', default="corrupt_trained_model.pt")
+    parser.add_argument('--save_model_path', type=str, help='path that new model saved in',
+                        default="corrupt_trained_model.pt")
     parser.add_argument('--batch_size', type=int, default=32, help='batch size')
-    parser.add_argument('--epsilon', type=float, default=0.1, help='fraction of gradients to corrupt, value between 0 and 1.')
+    parser.add_argument('--epsilon', type=float, default=0.1,
+                        help='fraction of gradients to corrupt, value between 0 and 1.')
     parser.add_argument('--lr', default=2e-5, type=float, help='learning rate')
+    parser.add_argument('--train_data_path', default='data/train.tsv', type=str, help='path to train.tsv')
     args = parser.parse_args()
 
     model, parallel_model, tokenizer = process_model(args.ori_model_path, device)
@@ -238,11 +252,11 @@ if __name__ == '__main__':
     EPSILON = args.epsilon
     LR = args.lr
     optimizer = AdamW(model.parameters(), lr=LR)
-    train_data_path = 'data/train.tsv'
+    train_data_path = args.train_data_path
     save_model = True
     save_path = args.save_model_path
     save_metric = 'acc'
 
-    logger.info("="*10 + "Training model on clean dataset" + "="*10)
+    logger.info("=" * 10 + "Training model on clean dataset" + "=" * 10)
     corrupt_train(train_data_path, model, tokenizer,
                   BATCH_SIZE, EPOCHS, optimizer, criterion, device, SEED, save_model, save_path, save_metric, EPSILON)
