@@ -27,14 +27,16 @@ def robust_aggregator(gradients,
 
         # Determine the maximum covariance and its direction
         lambdas, U = torch.linalg.eig(cov)
-        _, sorted_indices = torch.sort(torch.abs(lambdas), descending=True)
+        spectral_norm = torch.abs(lambdas).max().item() # taking abs because the eigen value can be complex
 
+        # old approach: no need to really sort anything here as we just pick the largest already
         # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
-        lambdas = lambdas[sorted_indices]
-        U = U[:, sorted_indices]
+        # _, sorted_indices = torch.sort(torch.abs(lambdas), descending=True)
+        # lambdas = lambdas[sorted_indices]
+        # U = U[:, sorted_indices]
 
         # need to compare with the spectral norm which corresponds to the largest eigen value  which is in the first position (based on the provided algorithm )
-        spectral_norm = torch.abs(lambdas[0]).item() # taking abs because the eigen value can be complex
+        # spectral_norm = torch.abs(lambdas[0]).item() # taking abs because the eigen value can be complex
 
         if spectral_norm > eps_threshold:
             mean_gradient = gradients.mean(dim=0)
