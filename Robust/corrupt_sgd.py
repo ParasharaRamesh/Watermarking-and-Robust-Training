@@ -92,11 +92,19 @@ def corruption_strategy_2(stacked_grads, epsilon):
     cov = calculate_covariance_matrix(stacked_grads)
     lambdas, U = torch.linalg.eig(cov)
 
-    # sort the lambdas and U
+    # pick the largest eigen vector
+    max_index = torch.abs(lambdas).argmax()
+    max_var_direction = U[max_index]
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
+    projections_on_max_var = stacked_grads @ max_var_direction # shape (n,)
+    _, top_indices = torch.topk(projections_on_max_var, num_corrupt, largest=True)
 
-    # change all of them to 0
+    # creating a zero tensor similar to the same shape, type and input device
+    zero_tensor = torch.zeros_like(stacked_grads[0])
+
+    # replace with zero tensor
+    stacked_grads[top_indices] = zero_tensor
 
     return stacked_grads
 
