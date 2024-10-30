@@ -8,7 +8,7 @@ import random
 import codecs
 import numpy as np
 import os
-from robust_aggregator import robust_aggregator
+from robust_aggregator import robust_aggregator, calculate_covariance_matrix
 import logging
 import autograd_hacks
 
@@ -79,6 +79,24 @@ def corruption_strategy_1(stacked_grads, epsilon):
 
     # replace with zero tensor
     stacked_grads[corrupt_indices] = zero_tensor
+
+    return stacked_grads
+
+def corruption_strategy_2(stacked_grads, epsilon):
+    '''similar to strategy 1, just that we pick epsilon vectors which are mostly aligned in the direction of the max eigen vector and make that zero'''
+    n = stacked_grads.shape[0] #stacked_grads shape is (batch_size, N)
+    num_corrupt = int(n * epsilon)
+
+    # TODO.x
+    # find the largest eigen vector
+    cov = calculate_covariance_matrix(stacked_grads)
+    lambdas, U = torch.linalg.eig(cov)
+
+    # sort the lambdas and U
+
+    # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
+
+    # change all of them to 0
 
     return stacked_grads
 

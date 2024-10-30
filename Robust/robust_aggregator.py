@@ -9,14 +9,12 @@ from tqdm import tqdm
 #
 
 def robust_aggregator(gradients,
-                      eps_threshold=9 * 39275):  # hardcoding the eps threshold to k* SIGMA provided in question
+                      eps_threshold=9 * 39275,
+                      show_progress=False):  # hardcoding the eps threshold to k* SIGMA provided in question
     # Clone the original gradients to avoid modifying the input
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     gradients = gradients.clone()
     n = gradients.shape[0]
-
-    # show_progress = True
-    show_progress = False
 
     pbar = tqdm(total=n) if show_progress else None
 
@@ -29,6 +27,11 @@ def robust_aggregator(gradients,
 
         # Determine the maximum covariance and its direction
         lambdas, U = torch.linalg.eig(cov)
+        _, sorted_indices = torch.sort(torch.abs(lambdas), descending=True)
+
+        # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
+        lambdas = lambdas[sorted_indices]
+        U = U[:, sorted_indices]
 
         # need to compare with the spectral norm which corresponds to the largest eigen value  which is in the first position (based on the provided algorithm )
         spectral_norm = torch.abs(lambdas[0]).item() # taking abs because the eigen value can be complex
@@ -129,13 +132,21 @@ if __name__ == '__main__':
     print(f"max cov index is {i}, {j}") #296,296
 
     # step3: what is the direction of the max variance (unit vector along max eigen vector), since cov is positive semi definite no need to sort as the first eigen value is already max
+
     lambdas, U = torch.linalg.eig(cov)
+
+    # Get the indices that would sort lambdas by their absolute values in descending order (TODO.x review the PSD issue with covariance matrix)
+    _, sorted_indices = torch.sort(torch.abs(lambdas), descending=True)
+
+    # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
+    lambdas = lambdas[sorted_indices]
+    U = U[:, sorted_indices]
     max_var_eigen_vector = U[0]
     norm = torch.norm(max_var_eigen_vector, p=2)
     max_var_direction = max_var_eigen_vector / norm  # shape (d,)
     print(f"max variance eigen vector is {max_var_direction}")
     print(f"first 3 values of max var direction is [{max_var_direction[:3]}]") #[tensor([-3.6010164768e-02+0.j, 3.4746624529e-02+0.j, 2.3515963927e-02+0.j],device='cuda:0')]
-    print(f"last 3 values of max var direction is [{max_var_direction[-3:]}]") #[tensor([ 3.4827093032e-07+0.j,  1.2595599230e-07+0.j, -9.0192429525e-08+0.j],device='cuda:0')]
+    print(f"last 3 values of max var direction is [{max_var_direction[-3:]}]") #[tensor([ 1.2595599230e-07+0.j,  3.4827093032e-07+0.j, -9.0192429525e-08+0.j],device='cuda:0')]
     print("-" * 60)
     print()
 
@@ -189,6 +200,6 @@ if __name__ == '__main__':
         Suppose I told you there were 673 poisoned gradients, what percentage did you detect?'''
     print("Part 2: Question 4 =>")
 
-    pruned_gradients = robust_aggregator(gradients)
+    pruned_gradients = robust_aggregator(gradients, show_progress=True)
     num_poisoned = gradients.shape[0] - pruned_gradients.shape[0]
     print(f"percentage of poisoned gradients: {(num_poisoned / 673) * 100} % ") # got 82.76374442793461% (afer 18 mins) i.e. 557/673
