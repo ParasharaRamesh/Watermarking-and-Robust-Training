@@ -76,17 +76,18 @@ def calculate_covariance_matrix(X):
     mu = X.mean(dim=0)  # Shape (d,)
     X = X - mu  # Shape (n, d) - centered along the mean
 
+    #TODO.x figure which approach.
     # approach 1. possibly incorrect as this will make X[i]
-    # cov_matrix = (X.T @ X) / (n - 1)  # cov matrix of shape d,d
+    cov_matrix = (X.T @ X) / (n - 1)  # cov matrix of shape d,d
 
     # approach 2: the dot product is calculated for each X[i] wrt itself and then summed and divided as opposed to approach 1 since there are differences
-    cov_matrix = torch.zeros((d,d)).to(device)
-    for i in range(n):
-        x = X[i].unsqueeze(0) # shape (1,d)
-        xt = x.transpose(0,1) # shape (d,1)
-        cov_matrix += xt @ x # shape (d,d)
-
-    cov_matrix /= n-1
+    # cov_matrix = torch.zeros((d,d)).to(device)
+    # for i in range(n):
+    #     x = X[i].unsqueeze(0) # shape (1,d)
+    #     xt = x.transpose(0,1) # shape (d,1)
+    #     cov_matrix += xt @ x # shape (d,d)
+    #
+    # cov_matrix /= n-1
 
     # approach 3: matrix form of doing approach 2 (but still not getting the exact same answer) and was slow on cpu
     # X_centered_expanded = X.unsqueeze(1)  # Shape (n, 1, d)
