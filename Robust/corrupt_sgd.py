@@ -87,7 +87,6 @@ def corruption_strategy_2(stacked_grads, epsilon):
     n = stacked_grads.shape[0] #stacked_grads shape is (batch_size, N)
     num_corrupt = int(n * epsilon)
 
-    # TODO.x
     # find the largest eigen vector
     cov = calculate_covariance_matrix(stacked_grads)
     lambdas, U = torch.linalg.eig(cov)
