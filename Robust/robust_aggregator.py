@@ -15,39 +15,44 @@ def robust_aggregator(gradients,
     gradients = gradients.clone()
     n = gradients.shape[0]
 
-    with tqdm(total=n) as pbar:
-        for i in range(n):
-            # Calculate the covariance matrix
-            cov = calculate_covariance_matrix(gradients)
+    # show_progress = True
+    show_progress = False
 
-            # old approach just using the max cov value
-            # max_cov = cov.max()
+    pbar = tqdm(total=n) if show_progress else None
 
-            # Determine the maximum covariance and its direction
-            lambdas, U = torch.linalg.eig(cov)
+    for i in range(n):
+        # Calculate the covariance matrix
+        cov = calculate_covariance_matrix(gradients)
 
-            # need to compare with the spectral norm which corresponds to the largest eigen value  which is in the first position (based on the provided algorithm )
-            spectral_norm = torch.abs(lambdas[0]).item() # taking abs because the eigen value can be complex
+        # old approach just using the max cov value
+        # max_cov = cov.max()
 
-            if spectral_norm > eps_threshold:
-                mean_gradient = gradients.mean(dim=0)
+        # Determine the maximum covariance and its direction
+        lambdas, U = torch.linalg.eig(cov)
 
-                # Project the distance of every gradient wrt mean gradient along the max variance direction
-                diff_gradient = gradients - mean_gradient
-                diff_gradient = diff_gradient.to(torch.complex64)
-                max_var_eigen_vector = U[0]
-                projections_on_max_var = diff_gradient.to(device) @ max_var_eigen_vector.to(device)
+        # need to compare with the spectral norm which corresponds to the largest eigen value  which is in the first position (based on the provided algorithm )
+        spectral_norm = torch.abs(lambdas[0]).item() # taking abs because the eigen value can be complex
 
-                # Find the index of the gradient with the maximum absolute distance
-                outlier_index = torch.abs(projections_on_max_var).argmax()
+        if spectral_norm > eps_threshold:
+            mean_gradient = gradients.mean(dim=0)
 
-                # Remove the outlier gradient
-                gradients = torch.cat((gradients[:outlier_index], gradients[outlier_index + 1:]), dim=0)
-            else:
-                # can stop here since we have already pruned it
-                print(f"Pruned gradients now has shape of {gradients.shape} after iteration {iter}")
-                break
+            # Project the distance of every gradient wrt mean gradient along the max variance direction
+            diff_gradient = gradients - mean_gradient
+            diff_gradient = diff_gradient.to(torch.complex64)
+            max_var_eigen_vector = U[0]
+            projections_on_max_var = diff_gradient.to(device) @ max_var_eigen_vector.to(device)
 
+            # Find the index of the gradient with the maximum absolute distance
+            outlier_index = torch.abs(projections_on_max_var).argmax()
+
+            # Remove the outlier gradient
+            gradients = torch.cat((gradients[:outlier_index], gradients[outlier_index + 1:]), dim=0)
+        else:
+            # can stop here since we have already pruned it
+            # print(f"Pruned gradients now has shape of {gradients.shape} after iteration {iter}")
+            break
+
+        if show_progress and pbar:
             # Update the description of the tqdm bar
             pbar.set_description(f"pruned gradient shape: {gradients.shape}")
 

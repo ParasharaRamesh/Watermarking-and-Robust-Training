@@ -51,14 +51,34 @@ def corrupt_gradients(stacked_grads, epsilon):
     Returns:
         corrupted_gradients: List of gradients after applying corruption.
     """
-    # TODO.Q2: corrupt epsilon fraction of the batch of gradients
     '''
-    strategy 1: just corrupt the epsilon fraction and make it all zero ( because it is centered around zero it wont remove it)
-    strategy 2: just place everything at that benign variance boundary:
-    - find the direction of the max eigen vector from the original
-    - pick the top epsilon fraction of grads which are generally pointing in that direction and replace everything with max-eigen-vector* benign std dev.
-    strategy 3: just place everything at the second largest eigen vector direction (or some combo because eigen vectors are generally orthonormal)
+    There are mainly 4 strategies which come to mind, of which I might just implement a few until I meet the requirement mentioned in the doc: 
+    
+    strategy 1: just corrupt a random epsilon fraction and make it all zero ( because it is centered around zero the robust aggregator wont remove it)
+    strategy 2: similar to strategy 1, just that we pick epsilon vectors which are mostly aligned in the direction of the max eigen vector and make that zero
+    strategy 3: just place everything at that benign variance boundary:
+        - find the direction of the max eigen vector from the original
+        - pick the top epsilon fraction of grads which are generally pointing in that direction and replace everything with max-eigen-vector * benign std dev.
+    strategy 4: spread epsilon grads at the benign variance boundary across different eigen vectors ( e.g. 2nd largest, 3rd largest etc)
     '''
+
+    return corruption_strategy_1(stacked_grads, epsilon)
+
+def corruption_strategy_1(stacked_grads, epsilon):
+    '''
+    Just corrupt the epsilon fraction and make it all zero (because it is centered around zero it wont remove it)
+    '''
+    n = stacked_grads.shape[0] #stacked_grads shape is (batch_size, N)
+    num_corrupt = int(n * epsilon)
+
+    # Randomly choose num_corrupt indices in the range [0, n) without replacement
+    corrupt_indices = torch.randperm(n)[:num_corrupt]
+
+    # creating a zero tensor similar to the same shape, type and input device
+    zero_tensor = torch.zeros_like(stacked_grads[0])
+
+    # replace with zero tensor
+    stacked_grads[corrupt_indices] = zero_tensor
 
     return stacked_grads
 
