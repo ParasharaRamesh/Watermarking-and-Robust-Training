@@ -1,3 +1,5 @@
+import math
+
 import torch
 from torch import nn
 from tqdm import tqdm
@@ -65,7 +67,6 @@ def corrupt_gradients(stacked_grads, epsilon):
         - pick the top epsilon fraction of grads which are generally pointing in that direction and replace everything with max-eigen-vector * benign std dev.
     strategy 4: spread epsilon grads at the benign variance boundary across different eigen vectors ( e.g. 2nd largest, 3rd largest etc)
     '''
-
     return corruption_strategy_1(stacked_grads, epsilon)
 
 
@@ -98,7 +99,7 @@ def corruption_strategy_2(stacked_grads, epsilon):
     lambdas, U = torch.linalg.eig(cov)
 
     # pick the largest eigen vector
-    max_index = torch.abs(lambdas).argmax()
+    max_index = torch.real(lambdas).argmax()
     max_var_direction = U[max_index]
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
@@ -110,6 +111,33 @@ def corruption_strategy_2(stacked_grads, epsilon):
 
     # replace with zero tensor
     stacked_grads[top_indices] = zero_tensor
+
+    return stacked_grads
+
+
+def corruption_strategy_3(stacked_grads, epsilon, benign_var=9 * 39275):
+    '''similar to strategy 2, just that we pick epsilon vectors which are mostly aligned in the direction of the max eigen vector and place that in the benign var boundary'''
+    n = stacked_grads.shape[0]  # stacked_grads shape is (batch_size, N)
+    num_corrupt = int(n * epsilon)
+    benign_std = math.sqrt(benign_var)
+
+    # find the largest eigen vector
+    cov = calculate_covariance_matrix(stacked_grads)
+    lambdas, U = torch.linalg.eig(cov)
+
+    # pick the largest eigen vector
+    max_index = torch.real(lambdas).argmax()
+    max_var_direction = U[max_index] / torch.norm(U[max_index], p=2)
+
+    # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
+    projections_on_max_var = stacked_grads @ max_var_direction  # shape (n,)
+    _, top_indices = torch.topk(projections_on_max_var, num_corrupt, largest=True)
+
+    # creating a tensor at a distance of benign_std
+    corrupt_tensor = max_var_direction * benign_std
+
+    # replace with zero tensor
+    stacked_grads[top_indices] = corrupt_tensor
 
     return stacked_grads
 

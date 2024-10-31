@@ -14,6 +14,7 @@ def robust_aggregator(gradients,
     # Clone the original gradients to avoid modifying the input
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     gradients = gradients.clone()
+    gradients.to(device)
     n = gradients.shape[0]
 
     pbar = tqdm(total=n) if show_progress else None
@@ -27,7 +28,9 @@ def robust_aggregator(gradients,
 
         # Determine the maximum covariance and its direction
         lambdas, U = torch.linalg.eig(cov)
-        spectral_norm = torch.real(lambdas).max().item() # taking abs because the eigen value can be complex
+        real_lambdas = torch.real(lambdas)
+        max_index = real_lambdas.argmax()
+        spectral_norm = real_lambdas[max_index].item() # taking abs because the eigen value can be complex
 
         # old approach: no need to really sort anything here as we just pick the largest already
         # # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
@@ -38,12 +41,13 @@ def robust_aggregator(gradients,
         # # need to compare with the spectral norm which corresponds to the largest eigen value which is in the first position (based on the provided algorithm )
         # spectral_norm = torch.abs(lambdas[0]).item() # taking abs because the eigen value can be complex
 
-        if spectral_norm > eps_threshold:
+        should_prune = spectral_norm > eps_threshold
+        if should_prune:
             mean_gradient = gradients.mean(dim=0)
 
             # Project the distance of every gradient wrt mean gradient along the max variance direction
             diff_gradient = gradients - mean_gradient
-            max_var_eigen_vector = torch.real(U[0])
+            max_var_eigen_vector = torch.real(U[max_index])
             projections_on_max_var = diff_gradient.to(device) @ max_var_eigen_vector.to(device)
 
             # Find the index of the gradient with the maximum absolute distance
