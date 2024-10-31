@@ -23,7 +23,7 @@ def binary_accuracy(preds, y):
 
 
 def process_data(data_file_path, seed):
-    logger.info("Loading file " + data_file_path)
+    print("Loading file " + data_file_path)
     random.seed(seed)
     all_data = codecs.open(data_file_path, 'r', 'utf-8').read().strip().split('\n')[1:]
     random.shuffle(all_data)
@@ -37,7 +37,7 @@ def process_data(data_file_path, seed):
 
 
 def process_model(model_path, device):
-    logger.info("Loading model " + model_path)
+    print("Loading model " + model_path)
     tokenizer = BertTokenizer.from_pretrained(model_path)
     model = BertForSequenceClassification.from_pretrained(model_path, return_dict=True)
     model = model.to(device)
@@ -137,7 +137,7 @@ def corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon):
     # TODO: Import your implementation of robust aggregator in Question 1
     stacked_grads = robust_aggregator(stacked_grads)
     filtered_cnt = orig_cnt - stacked_grads.shape[0]
-    logger.info(f"Acc {acc_num}, Filtered out {filtered_cnt} gradients")
+    print(f"Acc {acc_num}, Filtered out {filtered_cnt} gradients")
 
     # Compute average on corrupted gradients    
     last_grad = torch.mean(stacked_grads, dim=0)
@@ -201,7 +201,7 @@ def corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
 def corrupt_train(train_data_path, model, tokenizer,
                   batch_size, epochs, optimizer, criterion,
                   device, seed, save_model=True, save_path=None, save_metric='loss', epsilon=0.1):
-    logger.info('Seed: ' + str(seed))
+    print('Seed: ' + str(seed))
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -214,12 +214,12 @@ def corrupt_train(train_data_path, model, tokenizer,
     autograd_hacks.add_hooks(model)
 
     for epoch in range(epochs):
-        logger.info("Epoch: " + str(epoch))
+        print("Epoch: " + str(epoch))
         model.train(True)
         train_loss, train_acc, filter_ratio = corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
                                                                   batch_size, optimizer, criterion, device, epsilon)
 
-        logger.info(
+        print(
             f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc * 100:.2f}% | Filter ratio: {filter_ratio * 100:.2f}%')
 
     if save_model:
@@ -257,6 +257,6 @@ if __name__ == '__main__':
     save_path = args.save_model_path
     save_metric = 'acc'
 
-    logger.info("=" * 10 + "Training model on clean dataset" + "=" * 10)
+    print("=" * 10 + "Training model on clean dataset" + "=" * 10)
     corrupt_train(train_data_path, model, tokenizer,
                   BATCH_SIZE, EPOCHS, optimizer, criterion, device, SEED, save_model, save_path, save_metric, EPSILON)
