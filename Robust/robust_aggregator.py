@@ -27,7 +27,7 @@ def robust_aggregator(gradients,
 
         # Determine the maximum covariance and its direction
         lambdas, U = torch.linalg.eig(cov)
-        spectral_norm = torch.abs(lambdas).max().item() # taking abs because the eigen value can be complex
+        spectral_norm = torch.real(lambdas).max().item() # taking abs because the eigen value can be complex
 
         # old approach: no need to really sort anything here as we just pick the largest already
         # # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
@@ -43,12 +43,12 @@ def robust_aggregator(gradients,
 
             # Project the distance of every gradient wrt mean gradient along the max variance direction
             diff_gradient = gradients - mean_gradient
-            diff_gradient = diff_gradient.to(torch.complex64)
-            max_var_eigen_vector = U[0]
+            max_var_eigen_vector = torch.real(U[0])
             projections_on_max_var = diff_gradient.to(device) @ max_var_eigen_vector.to(device)
 
             # Find the index of the gradient with the maximum absolute distance
-            outlier_index = torch.abs(projections_on_max_var).argmax()
+            # outlier_index = torch.abs(projections_on_max_var).argmax()
+            outlier_index = torch.real(projections_on_max_var).argmax()
 
             # Remove the outlier gradient
             gradients = torch.cat((gradients[:outlier_index], gradients[outlier_index + 1:]), dim=0)
@@ -73,12 +73,16 @@ def calculate_covariance_matrix(X):
     X = X.to(device)
     n = X.shape[0]
     d = X.shape[1]
-    mu = X.mean(dim=0)  # Shape (d,)
-    X = X - mu  # Shape (n, d) - centered along the mean
 
     #TODO.x figure which approach.
+
+    #approach 0; use torch's internal cov function
+    cov_matrix = torch.cov(X.T)
+
     # approach 1. possibly incorrect as this will make X[i]
-    cov_matrix = (X.T @ X) / (n - 1)  # cov matrix of shape d,d
+    # mu = X.mean(dim=0)  # Shape (d,)
+    # X = X - mu  # Shape (n, d) - centered along the mean
+    # cov_matrix = (X.T @ X) / (n - 1)  # cov matrix of shape d,d
 
     # approach 2: the dot product is calculated for each X[i] wrt itself and then summed and divided as opposed to approach 1 since there are differences
     # cov_matrix = torch.zeros((d,d)).to(device)
@@ -139,12 +143,12 @@ if __name__ == '__main__':
     lambdas, U = torch.linalg.eig(cov)
 
     # Get the indices that would sort lambdas by their absolute values in descending order (TODO.x review the PSD issue with covariance matrix)
-    _, sorted_indices = torch.sort(torch.abs(lambdas), descending=True)
+    _, sorted_indices = torch.sort(torch.real(lambdas), descending=True)
 
     # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
     lambdas = lambdas[sorted_indices]
     U = U[:, sorted_indices]
-    max_var_eigen_vector = U[0]
+    max_var_eigen_vector = torch.real(U[0])
     norm = torch.norm(max_var_eigen_vector, p=2)
     max_var_direction = max_var_eigen_vector / norm  # shape (d,)
     print(f"max variance eigen vector is {max_var_direction}")
@@ -164,8 +168,6 @@ if __name__ == '__main__':
 
     # step2: projecting the distance of every gradient wrt mean gradient along the max var direction
     diff_gradient = gradients - mean_gradient  # shape (n,d)
-    diff_gradient = diff_gradient.to(
-        torch.complex64)  # making it a complex tensor because the max var direction contains imaginary components shape (n,d)
     projections_on_max_var = diff_gradient.to(device) @ max_var_direction.to(device)  # shape (n,)
 
     # step3: Find the index of the gradient with the maximum absolute distance
