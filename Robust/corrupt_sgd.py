@@ -98,9 +98,13 @@ def corruption_strategy_2(stacked_grads, epsilon):
     cov = calculate_covariance_matrix(stacked_grads)
     lambdas, U = torch.linalg.eig(cov)
 
+    real_lambdas = torch.real(lambdas)
+    real_U = torch.real(U)
+
     # pick the largest eigen vector
-    max_index = torch.real(lambdas).argmax()
-    max_var_direction = U[max_index]
+    max_index = real_lambdas.argmax()
+    max_var_direction = real_U[max_index]
+    max_var_direction /= torch.norm(max_var_direction)
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
     projections_on_max_var = stacked_grads @ max_var_direction  # shape (n,)
@@ -125,9 +129,13 @@ def corruption_strategy_3(stacked_grads, epsilon, benign_var=9 * 39275):
     cov = calculate_covariance_matrix(stacked_grads)
     lambdas, U = torch.linalg.eig(cov)
 
+    real_lambdas = torch.real(lambdas)
+    real_U = torch.real(U)
+
     # pick the largest eigen vector
-    max_index = torch.real(lambdas).argmax()
-    max_var_direction = U[max_index] / torch.norm(U[max_index], p=2)
+    max_index = real_lambdas.argmax()
+    max_var_direction = real_U[max_index]
+    max_var_direction /= torch.norm(max_var_direction)
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
     projections_on_max_var = stacked_grads @ max_var_direction  # shape (n,)
