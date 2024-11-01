@@ -39,10 +39,6 @@ def robust_aggregator(gradients,
             diff_gradient = gradients - mean_gradient
             projections_on_max_var = diff_gradient.to(device) @ max_var_direction.to(device)  # shape (n,)
 
-            #TODO.x.2 replace gradients just with mean centered one? (makes no difference)
-            # gradients = gradients - mean_gradient
-            # projections_on_max_var = gradients.to(device) @ max_var_direction.to(device)  # shape (n,)
-
             # Find the index of the gradient with the maximum absolute distance
             outlier_index = projections_on_max_var.argmax()
 
@@ -166,7 +162,7 @@ if __name__ == '__main__':
     '''Remove the gradient vector that seems most likely to be an outlier. Compute and report the maximum variance among the remaining gradient vectors. 
     By how much did the maximum variance change? '''
     print("Part 2: Question 3 =>")
-    # Step 1: Remove the outlier gradient (TODO.x.1 is this the correct way to remove?)
+    # Step 1: Remove the outlier gradient
     remaining_gradients = torch.cat((gradients[:outlier_index], gradients[outlier_index + 1:]), dim=0)  # Shape (n-1, d)
 
     # Step 2: Compute the covariance matrix of the remaining gradients
