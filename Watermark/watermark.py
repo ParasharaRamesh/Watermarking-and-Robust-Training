@@ -123,92 +123,37 @@ def verifier(sk, model, tokenizer, max_new_tokens):
     else:
         print("Given model is NOT watermarked with the given secret key")
 
-# Functions for Q3
-def attacker_verify_str(input_str, rs, model, tokenizer, max_new_tokens):
-    inputs = tokenizer(input_str, return_tensors="pt")
-    outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, return_dict_in_generate=True,
-                             output_scores=True)
-    input_len = inputs['input_ids'].shape[-1]
-    valids = []
-    for i in range(max_new_tokens):
-        # Get probability of i-th word
-        next_token_id = outputs.sequences[0][input_len + i]
-        next_token = tokenizer.decode(next_token_id)
-        scores = outputs.scores[i]
-        scores_processed = scores.clone().flatten().softmax(dim=-1)
-        r = rs[i]
-
-        # Using same logic as finding out the cummulative probability buckets to find out the next token id
-        bucket_probs = scores_processed.cumsum(dim=-1)
-        check_next_token_id = torch.searchsorted(bucket_probs, r)
-
-        # check if the tokens are indeed the same
-        valid = check_next_token_id.item() == next_token_id.item()
-
-        valids.append(valid)
-
-    # Check if 90% of generated tokens pass our verifier check
-    if np.array(valids).mean() >= 0.9:
-        return True
-    else:
-        return False
-def attacker_verifier(rs, model, tokenizer, max_new_tokens):
-    input_str = "Hello, my name is"
-    if attacker_verify_str(input_str, rs, model, tokenizer, max_new_tokens) == True:
-        print("Given model IS watermarked with the given secret key")
-    else:
-        print("Given model is NOT watermarked with the given secret key")
-
 
 if __name__ == '__main__':
     MAX_NEW_TOKENS = 10
     SECRET_KEY = random.randrange(sys.maxsize)
 
-    # Questions 1 & 2, change this flag
-    run_q1_q2 = False
-
     tokenizer = AutoTokenizer.from_pretrained("distilbert/distilgpt2")
 
-    if run_q1_q2:
-        MODEL_ORIG = GPT2LMHeadModel.from_pretrained("distilbert/distilgpt2")
-        MODEL_ORIG.generation_config.pad_token_id = tokenizer.eos_token_id
-        model = MyWatermarkedModel.from_pretrained("distilbert/distilgpt2", sk=SECRET_KEY)
-        model.generation_config.pad_token_id = tokenizer.eos_token_id
+    MODEL_ORIG = GPT2LMHeadModel.from_pretrained("distilbert/distilgpt2")
+    MODEL_ORIG.generation_config.pad_token_id = tokenizer.eos_token_id
+    model = MyWatermarkedModel.from_pretrained("distilbert/distilgpt2", sk=SECRET_KEY)
+    model.generation_config.pad_token_id = tokenizer.eos_token_id
 
-        prompts = [
-            "Hello, my dog is cute",
-            "Good morning, my"
-        ]
+    prompts = [
+        "Hello, my dog is cute",
+        "Good morning, my"
+    ]
 
-        for i, input_str in enumerate(prompts):
-            print(f"{i + 1}. Input str is `{input_str}`")
+    for i, input_str in enumerate(prompts):
+        print(f"{i + 1}. Input str is `{input_str}`")
 
-            print(f" -> Original model outputs..")
-            print(query_model(input_str, MODEL_ORIG, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
-            print("Verifying if output is watermarked.. (Should be False)")
-            print(verify_str(input_str, SECRET_KEY, MODEL_ORIG, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
-            print("-" * 50)
+        print(f" -> Original model outputs..")
+        print(query_model(input_str, MODEL_ORIG, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
+        print("Verifying if output is watermarked.. (Should be False)")
+        print(verify_str(input_str, SECRET_KEY, MODEL_ORIG, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
+        print("-" * 50)
 
-            print(f" -> New watermarked model outputs..")
-            print(query_model(input_str, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
-            print("Verifying if output is watermarked.. (Should be True)")
-            print(verify_str(input_str, SECRET_KEY, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
-            print("-" * 50)
+        print(f" -> New watermarked model outputs..")
+        print(query_model(input_str, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
+        print("Verifying if output is watermarked.. (Should be True)")
+        print(verify_str(input_str, SECRET_KEY, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
+        print("-" * 50)
 
-            print("=" * 50)
-            print()
-
-    # flag for running Question 3 :
-    run_q3 = True
-
-    #TODO.x perhaps do some kind of bayesian stuff where you just estimate many times, after assuming a fixed prior
-    if run_q3:
-        # ensure that this file is in the same Watermark folder
-        loaded_model = torch.load("watermarked_model.pt")
-        loaded_model.reset_seed()
-
-        rs = [random.random() for i in range(MAX_NEW_TOKENS)]
-        attacker_verifier(rs, loaded_model, tokenizer, max_new_tokens=MAX_NEW_TOKENS)
-
-
-
+        print("=" * 50)
+    print()
