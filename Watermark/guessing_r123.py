@@ -1,6 +1,5 @@
 from watermark import *
 import numpy as np
-from tqdm import tqdm
 import torch
 
 
@@ -34,12 +33,19 @@ def estimate(input_str, rs, model, tokenizer, max_new_tokens):
         curr_diff = high - low
         print(f"Pred range is {[low, high]} | diff : {curr_diff}")
 
-        if rs[i][0] <= low and high <= rs[i][1]:  # if there is a tighter bound overwrite it
-            rs[i][0] = low
-            rs[i][1] = high
-            print(f"Setting bound to {[low, high]}")
+        if curr_diff <= estimate_diff:
+            if rs[i][0] <= low and high <= rs[i][1]:  # if there is a tighter bound overwrite it
+                rs[i][0] = low
+                rs[i][1] = high
+                print(f"Range completely inside {[low, high]}")
+            elif rs[i][0] <= low and low <= rs[i][1] and rs[i][1] <= high:
+                rs[i][0] = low
+                print(f"Range partially inside, lower limit raised")
+            elif low <= rs[i][0] and rs[i][0] <= high and high <= rs[i][1]:
+                rs[i][1] = high
+                print(f"Range partially inside, higher limit lowered")
         else:
-            print(f"Not setting bound!!")
+            print(f"Estimate is too big!!")
         print("*" * 50)
         print()
 
@@ -53,7 +59,7 @@ def attacker_estimator(prompts, rs, model, tokenizer, num_tokens_to_generate):
     for i, prompt in enumerate(prompts):
         print(f"{i + 1}.) Prompt is `{prompt}`")
         print(f"current value of rs is {rs} ")
-        rs,completion = estimate(prompt, rs, model, tokenizer, num_tokens_to_generate)
+        rs, completion = estimate(prompt, rs, model, tokenizer, num_tokens_to_generate)
         completions.append(completion)
         print(f"after prompting value of rs is {rs}")
         print("-" * 50)
@@ -100,6 +106,7 @@ if __name__ == '__main__':
         "The cat jumped onto",
         "In the depths of the",
         "Singing and dancing are",
+        "Slow and steady wins",
         "Once upon a time in a land",
         "Medicines are needed when",
         "it is raining cats and dogs! the streets are",
@@ -138,10 +145,12 @@ if __name__ == '__main__':
     rs, completions = attacker_estimator(prompts, rs, model, tokenizer, num_tokens_to_generate)
 
     print("All completions are =>")
-    for i,completion in enumerate(completions):
-        print(f"{i+1}.> `{completion}`")
+    for i, completion in enumerate(completions):
+        print(f"{i + 1}.> `{completion}`")
 
     # save the rs into rs.npy
+
+    # [0.89036849 0.33339493 0.07841708] => correct upto 3 decimal places
     print(f"Saving {rs} into rs.npy")
     np.save("rs.npy", rs)
 
