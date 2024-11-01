@@ -101,6 +101,7 @@ def corruption_strategy_2(stacked_grads, epsilon):
 
     # find the largest eigen vector
     cov = calculate_covariance_matrix(stacked_grads)
+    cov += torch.eye(cov.size(0), device=cov.device) * 1e-7
     lambdas, U = torch.linalg.eigh(cov)
 
     # pick the largest eigen vector
@@ -129,6 +130,7 @@ def corruption_strategy_3(stacked_grads, epsilon, benign_var=9 * 39275):
 
     # find the largest eigen vector
     cov = calculate_covariance_matrix(stacked_grads)
+    cov += torch.eye(cov.size(0), device=cov.device) * 1e-7
     lambdas, U = torch.linalg.eigh(cov)
 
     # pick the largest eigen vector
@@ -172,7 +174,7 @@ def corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon, stra
     # TODO: Import your implementation of robust aggregator in Question 1
     stacked_grads = robust_aggregator(stacked_grads)
     filtered_cnt = orig_cnt - stacked_grads.shape[0]
-    print(f"Acc {acc_num}, Filtered out {filtered_cnt} gradients")
+    print(f" Acc {acc_num}, Filtered out {filtered_cnt} gradients")
 
     # Compute average on corrupted gradients    
     last_grad = torch.mean(stacked_grads, dim=0)
