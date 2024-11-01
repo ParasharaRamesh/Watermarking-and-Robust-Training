@@ -48,7 +48,7 @@ def process_model(model_path, device):
 
 
 # Randomly sample epsilon fraction of the gradients to corrupt
-def corrupt_gradients(stacked_grads, epsilon):
+def corrupt_gradients(stacked_grads, epsilon, strategy):
     """
     Corrupts epsilon fraction of individual gradients
     Args:
@@ -65,9 +65,14 @@ def corrupt_gradients(stacked_grads, epsilon):
     strategy 3: just place everything at that benign variance boundary:
         - find the direction of the max eigen vector from the original
         - pick the top epsilon fraction of grads which are generally pointing in that direction and replace everything with max-eigen-vector * benign std dev.
-    strategy 4: spread epsilon grads at the benign variance boundary across different eigen vectors ( e.g. 2nd largest, 3rd largest etc)
+    strategy 4: spread epsilon grads at the benign variance boundary across different eigen vectors ( e.g. 2nd largest, 3rd largest etc) (Not implemented)
     '''
-    return corruption_strategy_1(stacked_grads, epsilon)
+    if strategy == 1:
+        return corruption_strategy_1(stacked_grads, epsilon)
+    elif strategy == 2:
+        return corruption_strategy_2(stacked_grads, epsilon)
+    elif strategy == 3:
+        return corruption_strategy_3(stacked_grads, epsilon)
 
 
 def corruption_strategy_1(stacked_grads, epsilon):
@@ -96,18 +101,15 @@ def corruption_strategy_2(stacked_grads, epsilon):
 
     # find the largest eigen vector
     cov = calculate_covariance_matrix(stacked_grads)
-    lambdas, U = torch.linalg.eig(cov)
-
-    real_lambdas = torch.real(lambdas)
-    real_U = torch.real(U)
+    lambdas, U = torch.linalg.eigh(cov)
 
     # pick the largest eigen vector
-    max_index = real_lambdas.argmax()
-    max_var_direction = real_U[max_index]
+    max_var_direction = U[:,-1]
     max_var_direction /= torch.norm(max_var_direction)
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
-    projections_on_max_var = stacked_grads @ max_var_direction  # shape (n,)
+    diff_gradient = stacked_grads - stacked_grads.mean(dim=0)
+    projections_on_max_var = diff_gradient @ max_var_direction  # shape (n,)
     _, top_indices = torch.topk(projections_on_max_var, num_corrupt, largest=True)
 
     # creating a zero tensor similar to the same shape, type and input device
@@ -127,18 +129,15 @@ def corruption_strategy_3(stacked_grads, epsilon, benign_var=9 * 39275):
 
     # find the largest eigen vector
     cov = calculate_covariance_matrix(stacked_grads)
-    lambdas, U = torch.linalg.eig(cov)
-
-    real_lambdas = torch.real(lambdas)
-    real_U = torch.real(U)
+    lambdas, U = torch.linalg.eigh(cov)
 
     # pick the largest eigen vector
-    max_index = real_lambdas.argmax()
-    max_var_direction = real_U[max_index]
+    max_var_direction = U[:,-1]
     max_var_direction /= torch.norm(max_var_direction)
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
-    projections_on_max_var = stacked_grads @ max_var_direction  # shape (n,)
+    diff_gradient = stacked_grads - stacked_grads.mean(dim=0)
+    projections_on_max_var = diff_gradient @ max_var_direction  # shape (n,)
     _, top_indices = torch.topk(projections_on_max_var, num_corrupt, largest=True)
 
     # creating a tensor at a distance of benign_std
@@ -152,7 +151,7 @@ def corruption_strategy_3(stacked_grads, epsilon, benign_var=9 * 39275):
 
 # Generic train procedure for single batch of data
 # Simulate corrupting epsilon fraction of gradients of the classification layer
-def corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon):
+def corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon, strategy):
     outputs = model(**batch)
     acc_num, acc = binary_accuracy(outputs.logits, labels)
     loss = criterion(outputs.logits, labels)
@@ -168,7 +167,7 @@ def corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon):
     stacked_grads = stacked_grads.view(orig_cnt, -1)
 
     # Randomly sample epsilon fraction of the gradients to corrupt
-    stacked_grads = corrupt_gradients(stacked_grads, epsilon)
+    stacked_grads = corrupt_gradients(stacked_grads, epsilon, strategy)
 
     # TODO: Import your implementation of robust aggregator in Question 1
     stacked_grads = robust_aggregator(stacked_grads)
@@ -186,7 +185,7 @@ def corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon):
 
 # Generic train function for single epoch (over all batches of data)
 def corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
-                        batch_size, optimizer, criterion, device, epsilon):
+                        batch_size, optimizer, criterion, device, epsilon, strategy):
     """
     Generic train function for single epoch (over all batches of data)
 
@@ -226,7 +225,7 @@ def corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
         labels = labels.long().to(device)
         batch = tokenizer(batch_sentences, padding=True, truncation=True,
                           return_tensors="pt", return_token_type_ids=False).to(device)
-        loss, acc_num, filtered_cnt = corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon)
+        loss, acc_num, filtered_cnt = corrupt_train_iter(model, batch, labels, optimizer, criterion, epsilon, strategy)
         epoch_loss += loss.item() * len(batch_sentences)
         epoch_acc_num += acc_num
         filtered_cnts += filtered_cnt
@@ -236,8 +235,9 @@ def corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
 
 def corrupt_train(train_data_path, model, tokenizer,
                   batch_size, epochs, optimizer, criterion,
-                  device, seed, save_model=True, save_path=None, save_metric='loss', epsilon=0.1):
+                  device, strategy, seed, save_model=True, save_path=None, save_metric='loss', epsilon=0.1):
     print('Seed: ' + str(seed))
+    print('Strategy: ' + str(strategy))
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -253,7 +253,8 @@ def corrupt_train(train_data_path, model, tokenizer,
         print("Epoch: " + str(epoch))
         model.train(True)
         train_loss, train_acc, filter_ratio = corrupt_train_epoch(model, tokenizer, train_text_list, train_label_list,
-                                                                  batch_size, optimizer, criterion, device, epsilon)
+                                                                  batch_size, optimizer, criterion, device, epsilon,
+                                                                  strategy)
 
         print(
             f'\tTrain Loss: {train_loss:.3f} | Train Acc: {train_acc * 100:.2f}% | Filter ratio: {filter_ratio * 100:.2f}%')
@@ -279,6 +280,7 @@ if __name__ == '__main__':
                         help='fraction of gradients to corrupt, value between 0 and 1.')
     parser.add_argument('--lr', default=2e-5, type=float, help='learning rate')
     parser.add_argument('--train_data_path', default='data/train.tsv', type=str, help='path to train.tsv')
+    parser.add_argument('--strategy', default=1, type=int, help='corruption strategy')
     args = parser.parse_args()
 
     model, parallel_model, tokenizer = process_model(args.ori_model_path, device)
@@ -295,4 +297,6 @@ if __name__ == '__main__':
 
     print("=" * 10 + "Training model on clean dataset" + "=" * 10)
     corrupt_train(train_data_path, model, tokenizer,
-                  BATCH_SIZE, EPOCHS, optimizer, criterion, device, SEED, save_model, save_path, save_metric, EPSILON)
+                  BATCH_SIZE, EPOCHS, optimizer, criterion, device, args.strategy,
+                  SEED, save_model, save_path,
+                  save_metric, EPSILON)

@@ -13,7 +13,6 @@ def robust_aggregator(gradients,
                       show_progress=False):  # hardcoding the eps threshold to k* SIGMA provided in question
     # Clone the original gradients to avoid modifying the input
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    gradients = gradients.clone()
     gradients.to(device)
     n = gradients.shape[0]
 
@@ -23,18 +22,11 @@ def robust_aggregator(gradients,
         # Calculate the covariance matrix
         cov = calculate_covariance_matrix(gradients)
 
-        # old approach just using the max cov value
-        # max_cov = cov.max()
-
         # Determine the maximum covariance and its direction
-        lambdas, U = torch.linalg.eig(cov)
-        real_lambdas = torch.real(lambdas)
-        real_U = torch.real(U)
+        lambdas, U = torch.linalg.eigh(cov)
+        spectral_norm = lambdas[-1].item()
 
-        max_index = real_lambdas.argmax()
-        spectral_norm = real_lambdas[max_index].item() # taking abs because the eigen value can be complex
-
-        max_var_eigen_vector = torch.real(real_U[max_index])
+        max_var_eigen_vector = U[:,-1]
         norm = torch.norm(max_var_eigen_vector)
         max_var_direction = max_var_eigen_vector / norm
 
@@ -45,6 +37,10 @@ def robust_aggregator(gradients,
             # Project the distance of every gradient wrt mean gradient along the max variance direction
             diff_gradient = gradients - mean_gradient
             projections_on_max_var = diff_gradient.to(device) @ max_var_direction.to(device)  # shape (n,)
+
+            #TODO.x.2 replace gradients just with mean centered one? (makes no difference)
+            # gradients = gradients - mean_gradient
+            # projections_on_max_var = gradients.to(device) @ max_var_direction.to(device)  # shape (n,)
 
             # Find the index of the gradient with the maximum absolute distance
             outlier_index = projections_on_max_var.argmax()
@@ -73,8 +69,6 @@ def calculate_covariance_matrix(X):
     n = X.shape[0]
     d = X.shape[1]
 
-    #TODO.x figure which approach.
-
     #approach 0; use torch's internal cov function
     cov_matrix = torch.cov(X.T)
 
@@ -92,7 +86,7 @@ def calculate_covariance_matrix(X):
     #
     # cov_matrix /= n-1
 
-    # approach 3: matrix form of doing approach 2 (but still not getting the exact same answer) and was slow on cpu
+    # approach 3: matrix form of doing approach 2 and was slow on cpu
     # X_centered_expanded = X.unsqueeze(1)  # Shape (n, 1, d)
     # outer_products = X_centered_expanded.transpose(1, 2) @ X_centered_expanded # Shape (n, d, d)
     # cov_matrix_other = outer_products.sum(dim=0) / (n - 1)  # Shape (d, d)
@@ -101,7 +95,7 @@ def calculate_covariance_matrix(X):
     return cov_matrix
 
 def is_matrix_psd(X):
-    eigenvalues, eigenvectors = torch.linalg.eig(X)
+    eigenvalues, eigenvectors = torch.linalg.eigh(X)
     return torch.all(eigenvalues.max_cov >= -1e-10).item()
 
 if __name__ == '__main__':
@@ -117,7 +111,7 @@ if __name__ == '__main__':
     n = gradients.shape[0]
     d = gradients.shape[1]
 
-    benign_var = 39275  # spectral norm of the covariance matrix (i.e sqrt(SIGMA) )
+    benign_var = 39275
     k = 9
     eps_threshold = k * benign_var
 
@@ -128,26 +122,19 @@ if __name__ == '__main__':
     print("Part 2: Question 1 =>")
     cov = calculate_covariance_matrix(gradients)
 
-    # what is the direction of the max variance (unit vector along max eigen vector), since cov is positive semi definite no need to sort as the first eigen value is already max
-    lambdas, U = torch.linalg.eig(cov)
-    real_lambdas = torch.real(lambdas)
-    real_U = torch.real(U)
+    #NOTE: this does it in ascending order, meaning the last one is the highest lambda
+    lambdas, U = torch.linalg.eigh(cov)
 
-    # Get the indices that would sort lambdas by their absolute values in descending order
-    _, sorted_indices = torch.sort(real_lambdas, descending=True)
+    max_cov = lambdas[-1] # max variance
 
-    # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
-    real_lambdas = real_lambdas[sorted_indices]
-    real_U = real_U[:, sorted_indices]
-
-    max_var_eigen_vector = torch.real(real_U[0])
+    max_var_eigen_vector = U[:,-1]
     norm = torch.norm(max_var_eigen_vector)
-    max_var_direction = max_var_eigen_vector / norm  # shape (d,) unit vector
-    max_cov = real_lambdas[0] # max variance
 
-    print(f"max variance eigen vector is {max_cov}")
-    print(f"first 3 values of max var direction is [{max_var_direction[:3]}]")
-    print(f"last 3 values of max var direction is [{max_var_direction[-3:]}]")
+    max_var_direction = max_var_eigen_vector / norm  # shape (d,) unit vector
+
+    print(f"max variance eigen vector is {max_cov}") #19781812
+    print(f"first 3 values of max var direction is [{max_var_direction[:3]}]") #[2.5262700394e-02, 1.0088919662e-02, 3.7055097520e-02]
+    print(f"last 3 values of max var direction is [{max_var_direction[-3:]}]") #[-3.7027940154e-02, -1.1205702089e-02, 4.4668824412e-03]
     print("-" * 60)
     print()
 
@@ -168,9 +155,9 @@ if __name__ == '__main__':
     outlier_index = projections_on_max_var.argmax()
     outlier_gradient = gradients[outlier_index]
 
-    print(f"The most likely outlier gradient index is: {outlier_index}")
-    print(f"First 3 values of the outlier gradient: {outlier_gradient[:3]}")
-    print(f"Last 3 values of the outlier gradient: {outlier_gradient[-3:]}")
+    print(f"The most likely outlier gradient index is: {outlier_index}") #872
+    print(f"First 3 values of the outlier gradient: {outlier_gradient[:3]}") #[-0.0000000000e+00, 2.4866737425e-02, -1.1044409275e+00]
+    print(f"Last 3 values of the outlier gradient: {outlier_gradient[-3:]}") #[1.0991185904e+00, -2.6810422540e-01, 7.0607316494e-01]
     print("-" * 60)
     print()
 
@@ -178,29 +165,21 @@ if __name__ == '__main__':
     '''Remove the gradient vector that seems most likely to be an outlier. Compute and report the maximum variance among the remaining gradient vectors. 
     By how much did the maximum variance change? '''
     print("Part 2: Question 3 =>")
-    # Step 1: Remove the outlier gradient
+    # Step 1: Remove the outlier gradient (TODO.x.1 is this the correct way to remove?)
     remaining_gradients = torch.cat((gradients[:outlier_index], gradients[outlier_index + 1:]), dim=0)  # Shape (n-1, d)
 
     # Step 2: Compute the covariance matrix of the remaining gradients
     new_cov = calculate_covariance_matrix(remaining_gradients)
 
     # Step 3: Determine the maximum variance from the new covariance matrix
-    new_lambdas, new_U = torch.linalg.eig(new_cov)
-    real_new_lambdas = torch.real(new_lambdas)
-    real_new_U = torch.real(new_U)
+    new_lambdas, new_U = torch.linalg.eigh(new_cov)
 
-    # Get the indices that would sort lambdas by their absolute values in descending order (TODO.x review the PSD issue with covariance matrix)
-    _, new_sorted_indices = torch.sort(real_new_lambdas, descending=True)
-
-    # Sort lambdas and U accordingly ( typically it is not needed, but the EVD had complex entries so this is just a precaution )
-    real_new_lambdas = real_new_lambdas[new_sorted_indices]
-    real_new_U = real_new_U[:, new_sorted_indices]
-    new_max_cov = real_new_lambdas[0]  # max variance
+    new_max_cov = new_lambdas[-1]  # max variance
     print(f"New maximum covariance among remaining gradients is: {new_max_cov}")
 
     # Step 4: Calculate the change in maximum variance
     variance_change = new_max_cov - max_cov
-    print(f"Change in maximum variance: {variance_change}")
+    print(f"Change in maximum variance: {variance_change}") # -64558.0 (i.e. new variance is smaller than the old max variance)
     print("-" * 60)
     print()
 
