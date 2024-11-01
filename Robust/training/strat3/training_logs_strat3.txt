@@ -1,0 +1,47 @@
+Loading model /content/Watermarking-and-Robust-Training/Robust/SST2_clean_model
+==========Training model on clean dataset==========
+Seed: 1234
+Strategy: 3
+Loading file /content/Watermarking-and-Robust-Training/Robust/data/train.tsv
+Epoch: 0
+ Acc 31.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 29.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 29.0, Filtered out 0 gradients
+ Acc 29.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 29.0, Filtered out 0 gradients
+ Acc 29.0, Filtered out 0 gradients
+ Acc 28.0, Filtered out 0 gradients
+ Acc 28.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 28.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 28.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 28.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 28.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 32.0, Filtered out 0 gradients
+ Acc 27.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 32.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 31.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients
+ Acc 27.0, Filtered out 0 gradients
+ Acc 29.0, Filtered out 0 gradients
+ Acc 29.0, Filtered out 0 gradients
+ Acc 30.0, Filtered out 0 gradients

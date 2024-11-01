@@ -60,9 +60,11 @@ def corrupt_gradients(stacked_grads, epsilon, strategy):
     '''
     There are mainly 4 strategies which come to mind, of which I might just implement a few until I meet the requirement mentioned in the doc: 
     
-    strategy 1: just corrupt a random epsilon fraction and make it all zero ( because it is centered around zero the robust aggregator wont remove it)
-    strategy 2: similar to strategy 1, just that we pick epsilon vectors which are mostly aligned in the direction of the max eigen vector and make that zero
-    strategy 3: just place everything at that benign variance boundary:
+    refer to the /Robust/training/strat<i>/strategy<i>.ipynb to see training logs 
+    
+    strategy 1: just corrupt a random epsilon fraction and make it all zero ( because it is centered around zero the robust aggregator wont remove it) [DID NOT WORK]
+    strategy 2: similar to strategy 1, just that we pick epsilon vectors which are mostly aligned in the direction of the max eigen vector and make that zero [WORKED]
+    strategy 3: just place everything at that benign variance boundary: [RUNTIME ERROR DURING TRAINING]
         - find the direction of the max eigen vector from the original
         - pick the top epsilon fraction of grads which are generally pointing in that direction and replace everything with max-eigen-vector * benign std dev.
     strategy 4: spread epsilon grads at the benign variance boundary across different eigen vectors ( e.g. 2nd largest, 3rd largest etc) (Not implemented)
@@ -282,7 +284,7 @@ if __name__ == '__main__':
                         help='fraction of gradients to corrupt, value between 0 and 1.')
     parser.add_argument('--lr', default=2e-5, type=float, help='learning rate')
     parser.add_argument('--train_data_path', default='data/train.tsv', type=str, help='path to train.tsv')
-    parser.add_argument('--strategy', default=1, type=int, help='corruption strategy')
+    parser.add_argument('--strategy', default=2, type=int, help='corruption strategy') #strategy 2 is the one which works and have 96% training accuracy after 3 epochs
     args = parser.parse_args()
 
     model, parallel_model, tokenizer = process_model(args.ori_model_path, device)
