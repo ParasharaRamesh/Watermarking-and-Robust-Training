@@ -1,14 +1,6 @@
 import torch
 from tqdm import tqdm
 
-# For question 2, it would be helpful to define a function that returns the set of pruned gradients
-# def robust_aggregator(gradients):
-#     # Run pruning procedure
-#     pruned_gradients = gradients
-#     return pruned_gradients
-#
-
-#TODO.x this also doesnt work just prunes it only once
 def filtering_algorithm(gradients, eps_threshold=9 * 39275, show_progress=False):
     """
     Implements the filtering algorithm to update the set Y by removing or reducing outliers.
@@ -86,7 +78,6 @@ def robust_aggregator(gradients,
     # use the filtering algorithm mentioned in the paper instead
     if use_filtering_algorithm:
         return filtering_algorithm(gradients, eps_threshold, show_progress)
-
 
     n = gradients.shape[0]
 

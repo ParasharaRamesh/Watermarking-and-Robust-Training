@@ -9,7 +9,6 @@ import argparse
 import random
 import codecs
 import numpy as np
-import os
 from robust_aggregator import robust_aggregator, calculate_covariance_matrix
 import logging
 import autograd_hacks
@@ -67,7 +66,7 @@ def corrupt_gradients(stacked_grads, epsilon, strategy):
     strategy 3: just place everything at that benign variance boundary: [RUNTIME ERROR DURING TRAINING]
         - find the direction of the max eigen vector from the original
         - pick the top epsilon fraction of grads which are generally pointing in that direction and replace everything with max-eigen-vector * benign std dev.
-    strategy 4: spread epsilon grads at the benign variance boundary across different eigen vectors ( e.g. 2nd largest, 3rd largest etc) (Not implemented)
+    strategy 4: implementing the HiDRA attack from the reference paper
     '''
     if strategy == 1:
         return corruption_strategy_1(stacked_grads, epsilon)
@@ -75,6 +74,8 @@ def corrupt_gradients(stacked_grads, epsilon, strategy):
         return corruption_strategy_2(stacked_grads, epsilon)
     elif strategy == 3:
         return corruption_strategy_3(stacked_grads, epsilon)
+    elif strategy == 4:
+        return corruption_strategy_4(stacked_grads, epsilon)
 
 
 def corruption_strategy_1(stacked_grads, epsilon):
@@ -107,7 +108,7 @@ def corruption_strategy_2(stacked_grads, epsilon):
     lambdas, U = torch.linalg.eigh(cov)
 
     # pick the largest eigen vector
-    max_var_direction = U[:,-1]
+    max_var_direction = U[:, -1]
     max_var_direction /= torch.norm(max_var_direction)
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
@@ -136,7 +137,7 @@ def corruption_strategy_3(stacked_grads, epsilon, benign_var=9 * 39275):
     lambdas, U = torch.linalg.eigh(cov)
 
     # pick the largest eigen vector
-    max_var_direction = U[:,-1]
+    max_var_direction = U[:, -1]
     max_var_direction /= torch.norm(max_var_direction)
 
     # project all grads along this direction and pick the top epsilon grads which are along this direction in magnitude
@@ -149,6 +150,26 @@ def corruption_strategy_3(stacked_grads, epsilon, benign_var=9 * 39275):
 
     # replace with zero tensor
     stacked_grads[top_indices] = corrupt_tensor
+
+    return stacked_grads
+
+
+def corruption_strategy_4(stacked_grads, epsilon, benign_var=9 * 39275):
+    '''This strategy implements the HiDRA attack from the reference paper'''
+    n = stacked_grads.shape[0]  # stacked_grads shape is (batch_size, N)
+    num_corrupt = int(n * epsilon)
+
+    mu = stacked_grads.mean(dim=0)
+    s = mu / torch.norm(mu)
+    var_max = benign_var / math.sqrt(20)
+
+    num = benign_var - var_max
+    denom = (epsilon ** 2) + (epsilon * (1 - epsilon) ** 2)
+    z = math.sqrt(num / denom) - mu @ s
+
+    for i in range(n):
+        if i < num_corrupt:
+            stacked_grads[i] = mu - (z * s)
 
     return stacked_grads
 
@@ -284,7 +305,11 @@ if __name__ == '__main__':
                         help='fraction of gradients to corrupt, value between 0 and 1.')
     parser.add_argument('--lr', default=2e-5, type=float, help='learning rate')
     parser.add_argument('--train_data_path', default='data/train.tsv', type=str, help='path to train.tsv')
-    parser.add_argument('--strategy', default=2, type=int, help='corruption strategy') #strategy 2 is the one which works and have 96% training accuracy after 3 epochs
+    parser.add_argument('--strategy',
+                        # default=2, # strategy 2 is the one which works and have 96% training accuracy after 3 epochs
+                        default=4, # this is the HiDRA strategy the best one yet.
+                        type=int,
+                        help='corruption strategy')
     args = parser.parse_args()
 
     model, parallel_model, tokenizer = process_model(args.ori_model_path, device)
