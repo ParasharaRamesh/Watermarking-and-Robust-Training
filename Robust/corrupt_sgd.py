@@ -307,7 +307,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_data_path', default='data/train.tsv', type=str, help='path to train.tsv')
     parser.add_argument('--strategy',
                         # default=2, # strategy 2 is the one which works and have 96% training accuracy after 3 epochs
-                        default=4, # this is the HiDRA strategy the best one yet.
+                        default=4, # this is the HiDRA strategy the best one yet. (~4%% training accuracy)
                         type=int,
                         help='corruption strategy')
     args = parser.parse_args()
