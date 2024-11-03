@@ -75,7 +75,7 @@ def verify_str(input_str, sk, model, tokenizer, max_new_tokens):
     random.seed(sk)
     rs = [random.random() for _ in range(max_new_tokens)]
     # Generate tokens with model
-    random.seed(sk)
+    model.reset_seed()
     inputs = tokenizer(input_str, return_tensors="pt")
     outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, return_dict_in_generate=True,
                             output_scores=True)      
