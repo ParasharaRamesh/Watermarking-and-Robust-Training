@@ -64,7 +64,7 @@ def robust_aggregator(gradients,
                       ):  # hardcoding the eps threshold to k* SIGMA provided in question
     # Clone the original gradients to avoid modifying the input
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    gradients.to(device)
+    gradients = gradients.to(device)
 
     # use the filtering algorithm mentioned in the paper instead
     if use_filtering_algorithm:
@@ -77,13 +77,21 @@ def robust_aggregator(gradients,
     for i in range(n):
         # Calculate the covariance matrix
         cov = calculate_covariance_matrix(gradients)
-
-        # hack to ensure numerical stability of eigh
-        torch.backends.cuda.preferred_linalg_library('cusolver')
-
         # Tikhonov regularization to prevent problems with eigh not converging in CUDA
         cov += torch.eye(cov.size(0), device=cov.device) * 1e-8
-        lambdas, U = torch.linalg.eigh(cov)
+
+        try:
+            # hack to ensure numerical stability of eigh
+            torch.backends.cuda.preferred_linalg_library('cusolver')
+            lambdas, U = torch.linalg.eigh(cov)
+        except Exception as e:
+            print(f" Trying out EIGH in CPU !!! got exception {e}")
+            #change it to cpu
+            cov = cov.to("cpu")
+            lambdas, U = torch.linalg.eigh(cov)
+            lambdas = lambdas.to(device)
+            U = U.to(device)
+
         spectral_norm = lambdas[-1].item()
 
         max_var_eigen_vector = U[:, -1]
