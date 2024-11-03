@@ -1,5 +1,8 @@
+import random
+
 import torch
 from tqdm import tqdm
+
 
 def filtering_algorithm(gradients, eps_threshold=9 * 39275, show_progress=False):
     """
@@ -66,6 +69,7 @@ def filtering_algorithm(gradients, eps_threshold=9 * 39275, show_progress=False)
 
     return gradients
 
+
 def robust_aggregator(gradients,
                       eps_threshold=9 * 39275,
                       show_progress=False,
@@ -88,11 +92,11 @@ def robust_aggregator(gradients,
         cov = calculate_covariance_matrix(gradients)
 
         # Tikhonov regularization to prevent problems with eigh not converging in CUDA
-        cov += torch.eye(cov.size(0), device=cov.device) * 1e-5
+        cov += torch.eye(cov.size(0), device=cov.device) * 1e-7 * random.randint(1, 4)
         lambdas, U = torch.linalg.eigh(cov)
         spectral_norm = lambdas[-1].item()
 
-        max_var_eigen_vector = U[:,-1]
+        max_var_eigen_vector = U[:, -1]
         norm = torch.norm(max_var_eigen_vector)
         max_var_direction = max_var_eigen_vector / norm
 
@@ -124,6 +128,7 @@ def robust_aggregator(gradients,
     # return the pruned gradients
     return gradients
 
+
 def calculate_covariance_matrix(X):
     ''' This calculates the covariance matrix in the same way prescribed in the slides without using a direct cov function present in torch'''
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -131,7 +136,7 @@ def calculate_covariance_matrix(X):
     n = X.shape[0]
     d = X.shape[1]
 
-    #approach 0; use torch's internal cov function
+    # approach 0; use torch's internal cov function
     cov_matrix = torch.cov(X.T)
 
     # approach 1. possibly incorrect as this will make X[i]
@@ -156,9 +161,11 @@ def calculate_covariance_matrix(X):
     # is_psd = is_matrix_psd(cov_matrix)
     return cov_matrix
 
+
 def is_matrix_psd(X):
     eigenvalues, eigenvectors = torch.linalg.eigh(X)
     return torch.all(eigenvalues.max_cov >= -1e-10).item()
+
 
 if __name__ == '__main__':
     # Setup
@@ -184,19 +191,21 @@ if __name__ == '__main__':
     print("Part 2: Question 1 =>")
     cov = calculate_covariance_matrix(gradients)
 
-    #NOTE: this does it in ascending order, meaning the last one is the highest lambda
+    # NOTE: this does it in ascending order, meaning the last one is the highest lambda
     lambdas, U = torch.linalg.eigh(cov)
 
-    max_cov = lambdas[-1] # max variance
+    max_cov = lambdas[-1]  # max variance
 
-    max_var_eigen_vector = U[:,-1]
+    max_var_eigen_vector = U[:, -1]
     norm = torch.norm(max_var_eigen_vector)
 
     max_var_direction = max_var_eigen_vector / norm  # shape (d,) unit vector
 
-    print(f"max variance eigen vector is {max_cov}") #19781812
-    print(f"first 3 values of max var direction is [{max_var_direction[:3]}]") #[2.5262700394e-02, 1.0088919662e-02, 3.7055097520e-02]
-    print(f"last 3 values of max var direction is [{max_var_direction[-3:]}]") #[-3.7027940154e-02, -1.1205702089e-02, 4.4668824412e-03]
+    print(f"max variance eigen vector is {max_cov}")  # 19781812
+    print(
+        f"first 3 values of max var direction is [{max_var_direction[:3]}]")  # [2.5262700394e-02, 1.0088919662e-02, 3.7055097520e-02]
+    print(
+        f"last 3 values of max var direction is [{max_var_direction[-3:]}]")  # [-3.7027940154e-02, -1.1205702089e-02, 4.4668824412e-03]
     print("-" * 60)
     print()
 
@@ -217,9 +226,11 @@ if __name__ == '__main__':
     outlier_index = projections_on_max_var.argmax()
     outlier_gradient = gradients[outlier_index]
 
-    print(f"The most likely outlier gradient index is: {outlier_index}") #872
-    print(f"First 3 values of the outlier gradient: {outlier_gradient[:3]}") #[-0.0000000000e+00, 2.4866737425e-02, -1.1044409275e+00]
-    print(f"Last 3 values of the outlier gradient: {outlier_gradient[-3:]}") #[1.0991185904e+00, -2.6810422540e-01, 7.0607316494e-01]
+    print(f"The most likely outlier gradient index is: {outlier_index}")  # 872
+    print(
+        f"First 3 values of the outlier gradient: {outlier_gradient[:3]}")  # [-0.0000000000e+00, 2.4866737425e-02, -1.1044409275e+00]
+    print(
+        f"Last 3 values of the outlier gradient: {outlier_gradient[-3:]}")  # [1.0991185904e+00, -2.6810422540e-01, 7.0607316494e-01]
     print("-" * 60)
     print()
 
@@ -241,7 +252,8 @@ if __name__ == '__main__':
 
     # Step 4: Calculate the change in maximum variance
     variance_change = new_max_cov - max_cov
-    print(f"Change in maximum variance: {variance_change}") # -64558.0 (i.e. new variance is smaller than the old max variance)
+    print(
+        f"Change in maximum variance: {variance_change}")  # -64558.0 (i.e. new variance is smaller than the old max variance)
     print("-" * 60)
     print()
 
@@ -252,4 +264,5 @@ if __name__ == '__main__':
 
     pruned_gradients = robust_aggregator(gradients, show_progress=True)
     num_poisoned = gradients.shape[0] - pruned_gradients.shape[0]
-    print(f"percentage of poisoned gradients: {(num_poisoned / 673) * 100} % ") # got 82.76374442793461% (afer 18 mins) i.e. 557/673
+    print(
+        f"percentage of poisoned gradients: {(num_poisoned / 673) * 100} % ")  # got 82.76374442793461% (afer 18 mins) i.e. 557/673
