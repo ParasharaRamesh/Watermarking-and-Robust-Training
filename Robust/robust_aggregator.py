@@ -5,17 +5,6 @@ from tqdm import tqdm
 
 
 def filtering_algorithm(gradients, eps_threshold=9 * 39275, show_progress=False):
-    """
-    Implements the filtering algorithm to update the set Y by removing or reducing outliers.
-
-    Parameters:
-    - gradients (torch.Tensor): The input tensor of shape (n, d), where n is the number of vectors.
-    - eps_threshold (float): The threshold value for filtering (not used directly in this implementation).
-    - show_progress (bool): Whether to display a progress bar for the filtering process.
-
-    Returns:
-    - updated_Y (torch.Tensor): The filtered set Y with updated weights applied to each vector.
-    """
     # Step 1: Initialize equal weights c_i for each vector
     n, d = gradients.shape
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -29,7 +18,6 @@ def filtering_algorithm(gradients, eps_threshold=9 * 39275, show_progress=False)
         mu_c = (c.unsqueeze(1) * gradients).sum(dim=0)
 
         # Step 3: Calculate the covariance matrix of Y and find the largest eigenvector
-        # This is Cov(Y) = Σ_i c_i * (y_i - µ_c) * (y_i - µ_c)^T
         diff_Y = gradients - mu_c  # Centering Y by subtracting the weighted mean
         Cov_Y = calculate_covariance_matrix(diff_Y)  # Weighted covariance matrix
         Cov_Y += torch.eye(d, device=device) * 1e-7  # Regularization to ensure numerical stability
@@ -39,12 +27,11 @@ def filtering_algorithm(gradients, eps_threshold=9 * 39275, show_progress=False)
 
         should_prune = spectral_norm > eps_threshold
         if should_prune:
-            # Step 4: Compute τ_i for each vector y_i, τ_i = ⟨y_i - µ_c, v⟩^2
             tau = (diff_Y @ v).pow(2)  # Square the projections to get τ_i
 
-            # Step 5: Update weights based on τ_i, c_i := c_i * (1 - τ_i / τ_max)
-            tau_max = tau.max()  # Get the maximum τ_i value
-            c = c * (1 - (tau / tau_max))  # Adjust each weight based on its τ_i value
+            # Step 5: Update weights
+            tau_max = tau.max()
+            c = c * (1 - (tau / tau_max))
 
             # Step 6: Count non-zero weights and filter out zero-weight vectors
             nonzero_mask = c != 0  # Identify vectors with non-zero weights
