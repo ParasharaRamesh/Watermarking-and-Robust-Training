@@ -88,7 +88,7 @@ def robust_aggregator(gradients,
         cov = calculate_covariance_matrix(gradients)
 
         # Tikhonov regularization to prevent problems with eigh not converging in CUDA
-        cov += torch.eye(cov.size(0), device=cov.device) * 1e-7
+        cov += torch.eye(cov.size(0), device=cov.device) * 1e-5
         lambdas, U = torch.linalg.eigh(cov)
         spectral_norm = lambdas[-1].item()
 
