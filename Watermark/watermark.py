@@ -59,6 +59,7 @@ class MyWatermarkedModel(GPT2LMHeadModel):
             outputs = super().generate(input_ids=input_ids, attention_mask=attention_mask, max_new_tokens=1, return_dict_in_generate=True,output_scores=True)
             scores.append(outputs.scores[0])
         outputs.scores = tuple(scores)
+        outputs.sequences = output_ids
         
         return outputs
 
