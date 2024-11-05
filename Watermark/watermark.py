@@ -1,3 +1,4 @@
+import sys
 import torch
 from transformers import AutoTokenizer
 from transformers.generation.logits_process import LogitsProcessor, LogitsProcessorList
@@ -27,9 +28,11 @@ class MyWatermarkLogitsProcessor(LogitsProcessor):
         vocab_tensor = torch.arange(scores.shape[-1], device=scores.device)
         next_token_mask = torch.isin(vocab_tensor, next_token_id)  # boolean mask for each of the elements
 
-        scores_processed = scores.masked_fill(next_token_mask, float("inf"))  # only the element at next_token_id will be made inf while the rest remains as is
+        scores_processed = scores.masked_fill(next_token_mask, float(
+            "inf"))  # only the element at next_token_id will be made inf while the rest remains as is
 
-        scores_processed = scores_processed.masked_fill(~next_token_mask, -float("inf"))  # all other entries apart from the next token is made as -inf
+        scores_processed = scores_processed.masked_fill(~next_token_mask, -float(
+            "inf"))  # all other entries apart from the next token is made as -inf
         return scores_processed
 
 
@@ -80,12 +83,16 @@ def query_model(input_str, model, tokenizer, max_new_tokens):
     return output_str
 
 
-def verify_str(input_str, sk, model, tokenizer, max_new_tokens):
+def verify_str(input_str, sk, model, tokenizer, max_new_tokens, is_model_watermarked=False):
     # Generate list of r values
     random.seed(sk)
     rs = [random.random() for _ in range(max_new_tokens)]
-    # Generate tokens with model
-    model.reset_seed()
+    if is_model_watermarked:
+        # Generate tokens with watermarked model
+        model.reset_seed()
+    else:
+        # if the model is not watermarked it does not have the reset_seed function
+        random.seed(sk)
     inputs = tokenizer(input_str, return_tensors="pt")
     outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, return_dict_in_generate=True,
                              output_scores=True)
@@ -152,7 +159,8 @@ if __name__ == '__main__':
         print(f" -> New watermarked model outputs..")
         print(query_model(input_str, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
         print("Verifying if output is watermarked.. (Should be True)")
-        print(verify_str(input_str, SECRET_KEY, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS))
+        print(verify_str(input_str, SECRET_KEY, model, tokenizer, max_new_tokens=MAX_NEW_TOKENS,
+                         is_model_watermarked=True))
         print("-" * 50)
 
         print("=" * 50)
