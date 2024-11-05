@@ -1,4 +1,3 @@
-import sys
 import torch
 from transformers import AutoTokenizer
 from transformers.generation.logits_process import LogitsProcessor, LogitsProcessorList
@@ -68,6 +67,7 @@ class MyWatermarkedModel(GPT2LMHeadModel):
                                        return_dict_in_generate=True, output_scores=True)
             scores.append(outputs.scores[0])
         outputs.scores = tuple(scores)
+        outputs.sequences = output_ids
 
         return outputs
 
@@ -85,7 +85,7 @@ def verify_str(input_str, sk, model, tokenizer, max_new_tokens):
     random.seed(sk)
     rs = [random.random() for _ in range(max_new_tokens)]
     # Generate tokens with model
-    random.seed(sk)
+    model.reset_seed()
     inputs = tokenizer(input_str, return_tensors="pt")
     outputs = model.generate(**inputs, max_new_tokens=max_new_tokens, return_dict_in_generate=True,
                              output_scores=True)
