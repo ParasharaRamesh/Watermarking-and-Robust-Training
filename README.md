@@ -1,6 +1,4 @@
-# CS5562-HW3
-
-This is the second homework assignment for CS5562 Trustworthy ML. Please clone this repo or download all the Python files and proceed with the instructions on the PDF.
+This is the third homework assignment for CS5562 Trustworthy ML. Refer to the pdf for further instructions.
 
 The files for the first part are in `Watermark/`, and those for the second part are in `Robust/`. 
 
